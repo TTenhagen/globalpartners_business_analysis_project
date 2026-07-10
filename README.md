@@ -50,9 +50,9 @@ order_item_   │
                                     │
                                     ▼
                     ┌───────────────────────────────┐
-                    │  customer_clv_daily (GOLD)     │
-                    │  grain: (user_id, snapshot_date)│
-                    │  — cumulative spend window fn   │
+                    │ customer_clv_daily (GOLD)     │
+                    │grain: (user_id, snapshot_date)│
+                    │— cumulative spend window fn   │
                     └───────────────────────────────┘
 ```
 
