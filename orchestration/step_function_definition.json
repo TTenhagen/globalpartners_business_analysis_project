@@ -1,0 +1,91 @@
+{
+ "Comment": "Global Partners daily CLV pipeline -- extract, transform, load, alert on failure",
+ "StartAt": "ExtractFromSQLServer",
+ "States": {
+ "ExtractFromSQLServer": {
+ "Type": "Task",
+ "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-extract-to-s3" },
+ "Retry": [{ "ErrorEquals": ["States.ALL"], "IntervalSeconds": 60,
+ "MaxAttempts": 3, "BackoffRate": 2.0 }],
+ "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+ "Next": "RunCrawler"
+ },
+ "RunCrawler": {
+ "Type": "Task",
+ "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+ "Parameters": { "Name": "gp-bronze-crawler" },
+ "Retry": [{ "ErrorEquals": ["States.ALL"], "IntervalSeconds": 60,
+ "MaxAttempts": 2, "BackoffRate": 2.0 }],
+ "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+ "Next": "BronzeToSilver"
+ },
+ "BronzeToSilver": {
+ "Type": "Task",
+ "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-bronze-to-silver-orders" },
+ "Retry": [{ "ErrorEquals": ["States.ALL"], "IntervalSeconds": 120,
+ "MaxAttempts": 3, "BackoffRate": 2.0 }],
+ "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+ "Next": "SilverToGoldCLV"
+ },
+ "SilverToGoldCLV": {
+ "Type": "Task",
+ "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-silver-to-gold-clv" },
+ "Retry": [{ "ErrorEquals": ["States.ALL"], "IntervalSeconds": 120,
+ "MaxAttempts": 3, "BackoffRate": 2.0 }],
+ "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+ "Next": "GoldMetricJobs"
+ },
+ "GoldMetricJobs": {
+ "Type": "Parallel",
+ "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+ "Branches": [
+ { "StartAt": "RFM", "States": { "RFM": {
+    "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-silver-to-gold-rfm" }, "End": true } } },
+ { "StartAt": "Churn", "States": { "Churn": {
+ "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-silver-to-gold-churn" }, "End": true } } },
+ { "StartAt": "Sales", "States": { "Sales": {
+ "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-silver-to-gold-sales" }, "End": true } } },
+ { "StartAt": "Loyalty", "States": { "Loyalty": {
+ "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-silver-to-gold-loyalty" }, "End": true } } },
+ { "StartAt": "Location", "States": { "Location": {
+ "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-silver-to-gold-location" }, "End": true } } },
+ { "StartAt": "Discount", "States": { "Discount": {
+ "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync",
+ "Parameters": { "JobName": "gp-silver-to-gold-discount" }, "End": true } } }
+ ],
+ "Next": "LoadRedshift"
+ },
+ "LoadRedshift": {
+ "Type": "Task",
+ "Resource": "arn:aws:states:::aws-sdk:redshiftdata:batchExecuteStatement",
+ "Parameters": {
+ "ClusterIdentifier": "gp-redshift",
+ "Database": "globalpartners",
+ "SecretArn": "arn:aws:secretsmanager:us-east-1:ACCOUNT:secret:gp/redshift",
+ "Sqls.$": "States.Array('CALL sp_load_gold_tables()')"
+ },
+ "Retry": [{ "ErrorEquals": ["States.ALL"], "IntervalSeconds": 120,
+ "MaxAttempts": 2, "BackoffRate": 2.0 }],
+ "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+ "End": true
+ },
+ "NotifyFailure": {
+ "Type": "Task",
+ "Resource": "arn:aws:states:::sns:publish",
+ "Parameters": {
+ "TopicArn": "arn:aws:sns:us-east-1:ACCOUNT:gp-pipeline-alerts",
+ "Message.$": "States.Format('Global Partners pipeline failed: {}', $)"
+ },
+ "Next": "FailState"
+ },
+ "FailState": { "Type": "Fail", "Error": "PipelineFailed" }
+ }
+}

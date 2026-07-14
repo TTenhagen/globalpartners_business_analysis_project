@@ -1,0 +1,15 @@
+{
+ "Name": "restaurant-sqlserver",
+ "Description": "JDBC connection to the Global Partners SQL Server source (SSL enforced)",
+ "ConnectionType": "JDBC",
+ "ConnectionProperties": {
+ "JDBC_CONNECTION_URL": "jdbc:sqlserver://<sql-server-host>:1433;databaseName=globalpartners;encrypt=true;trustServerCertificate=true",
+ "JDBC_ENFORCE_SSL": "true",
+ "SECRET_ID": "restaurant/sqlserver-creds"
+ },
+ "PhysicalConnectionRequirements": {
+ "SubnetId": "subnet-REPLACE_ME",
+ "SecurityGroupIdList": ["sg-REPLACE_ME"],
+ "AvailabilityZone": "us-east-1a"
+ }
+}
