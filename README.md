@@ -96,11 +96,9 @@ All 6 pages are fully implemented in `dashboard/app.py` (no skeletons). Each pag
 ```
 restaruant-clv-project/
 ├── README.md
-├── .github/workflows/{ci.yml, deploy.yml}
 ├── architecture/
 │   ├── architecture_diagram.png
-│   ├── solution_design_document.docx
-│   └── sme_approval.pdf
+│   └── data_model.png
 ├── extraction/
 │   ├── glue_jdbc_connection.json
 │   └── extract_to_s3.py
